@@ -5,12 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FTD Decoy Calculator</title>
 <style>
-  :root { --bg: #1a1a2e; --surface: #16213e; --border: #0f3460; --accent: #e94560; --text: #eee; --muted: #888; --good: #4ade80; --warn: #facc15; }
+  :root { --bg: #1a1a2e; --surface: #16213e; --border: #0f3460; --accent: #e94560; --text: #eee; --muted: #888; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 1rem; max-width: 960px; margin: 0 auto; }
   h1 { font-size: 1.4rem; margin-bottom: 0.5rem; color: var(--accent); }
   h2 { font-size: 1.1rem; margin: 1rem 0 0.5rem; color: var(--accent); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; margin-bottom: 1rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; margin-bottom: 0.5rem; }
   label { display: flex; flex-direction: column; font-size: 0.8rem; color: var(--muted); }
   label span { margin-bottom: 2px; }
   input, select { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem; font-size: 0.9rem; }
@@ -23,9 +23,18 @@
   th:first-child, td:first-child { text-align: left; }
   th { color: var(--accent); font-weight: 600; border-bottom: 2px solid var(--border); position: sticky; top: 0; background: var(--bg); }
   tr.highlight { background: rgba(233, 69, 96, 0.15); }
-  tr.zero { color: var(--muted); }
   .table-wrap { max-height: 50vh; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
   .marker { color: var(--accent); font-weight: bold; }
+  .toggle-header { cursor: pointer; user-select: none; font-size: 0.9rem; color: var(--muted); margin: 0.5rem 0; }
+  .toggle-header:hover { color: var(--text); }
+  .angle-section { display: none; margin-bottom: 0.5rem; }
+  .angle-section.open { display: block; }
+  .hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; line-height: 1.4; }
+  .tab-bar { display: flex; gap: 0.25rem; margin: 1rem 0 0.5rem; }
+  .tab-btn { background: var(--surface); color: var(--muted); border: 1px solid var(--border); border-bottom: none; border-radius: 6px 6px 0 0; padding: 0.5rem 1rem; font-size: 0.9rem; cursor: pointer; }
+  .tab-btn.active { background: var(--bg); color: var(--accent); border-color: var(--accent); border-bottom: 1px solid var(--bg); font-weight: 600; }
+  .tab-panel { display: none; border: 1px solid var(--border); border-radius: 0 6px 6px 6px; padding: 1rem; }
+  .tab-panel.active { display: block; }
 </style>
 </head>
 <body>
@@ -34,34 +43,63 @@
 <p style="font-size:0.85rem;color:var(--muted);margin-bottom:0.5rem;">Select detection range depending on seeker. Radar detection range for Radar seekers and so on.</p>
 <div class="grid">
   <label><span>Detection Range (m)</span><input type="number" id="targetSignal" value="5000" min="1" step="100"></label>
-  <label><span>Decoy Missile Size</span>
-    <select id="size"><option value="S">S</option><option value="M" selected>M</option><option value="L">L</option><option value="H">H</option></select>
-  </label>
-  <label><span>Decoy Missiles</span><input type="number" id="missiles" value="1" min="1" max="50"></label>
   <label><span>Target % Success</span><input type="number" id="targetPct" value="90" min="1" max="100"></label>
   <label class="checkbox-row"><input type="checkbox" id="simpleIr"><span>Single Pixel IR Seeker</span></label>
   <label class="checkbox-row"><input type="checkbox" id="processor"><span>Signal Processor</span></label>
 </div>
 
-<h2>Geometry (optional)</h2>
 <div class="grid">
   <label><span>Ship Range (m)</span><input type="number" id="rangeShip" value="" placeholder="co-located"></label>
   <label><span>Decoy Range (m)</span><input type="number" id="rangeDecoy" value="" placeholder="co-located"></label>
 </div>
 
-<h2>Budget Optimization (optional)</h2>
-<div class="grid">
-  <label><span>Ammo Budget (ammo/s)</span><input type="number" id="budget" value="" placeholder="none"></label>
-  <label><span>Max Launchers</span><input type="number" id="maxLaunchers" value="" placeholder="unlimited"></label>
+<div class="toggle-header" id="angleToggle">&#9654; Advanced Angle Settings</div>
+<div class="angle-section" id="angleSection">
+  <div class="grid">
+    <label><span>Target Angle (deg)</span><input type="number" id="angleShip" value="0" min="0" max="360"></label>
+    <label><span>Decoy Angle (deg)</span><input type="number" id="angleDecoy" value="0" min="0" max="360"></label>
+    <label><span>Seeker Cone (deg)</span><input type="number" id="cone" value="180" min="1" max="360"></label>
+  </div>
+  <div class="hint">Active Radar: 360 | IR/Sonar: 120 | Single-Pixel IR: 60</div>
 </div>
 
-<div id="summary" class="summary-box"></div>
-<h2>Decoy Components Table</h2>
-<div class="table-wrap"><table id="mainTable"></table></div>
-<div id="budgetSection" style="display:none">
-  <h2>Budget Optimization</h2>
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="components">Components</button>
+  <button class="tab-btn" data-tab="ammo">Ammo/s</button>
+  <button class="tab-btn" data-tab="cost">System Cost</button>
+</div>
+
+<div id="tab-components" class="tab-panel active">
+  <div class="grid">
+    <label><span>Decoy Missile Size</span>
+      <select id="size"><option value="S">S</option><option value="M" selected>M</option><option value="L">L</option><option value="H">H</option></select>
+    </label>
+    <label><span>Decoy Missiles</span><input type="number" id="missiles" value="1" min="1" max="10"></label>
+  </div>
+  <div id="summary" class="summary-box"></div>
+  <div class="table-wrap"><table id="mainTable"></table></div>
+</div>
+
+<div id="tab-ammo" class="tab-panel">
+  <div class="grid">
+    <label><span>Decoy Missile Size</span>
+      <select id="sizeAmmo"><option value="S">S</option><option value="M" selected>M</option><option value="L">L</option><option value="H">H</option></select>
+    </label>
+    <label><span>Ammo Budget (ammo/s)</span><input type="number" id="budget" value="" placeholder="none"></label>
+    <label><span>Max Launchers</span><input type="number" id="maxLaunchers" value="" placeholder="unlimited (max 10)" max="10"></label>
+  </div>
   <div id="budgetSummary" class="summary-box"></div>
   <div class="table-wrap"><table id="budgetTable"></table></div>
+</div>
+
+<div id="tab-cost" class="tab-panel">
+  <div class="grid" style="grid-template-columns:repeat(auto-fill, minmax(280px, 1fr))">
+    <label><span>Additional Components</span><input type="number" id="additionalComponents" value="0" min="0" max="50"></label>
+    <label><span>Minimum Health</span><input type="number" id="minHealth" value="0" min="0"></label>
+    <label><span>Maximum Height Launcher+Gantries (m)</span><input type="number" id="maxHeight" value="10" min="1" max="100"></label>
+  </div>
+  <div id="costSummary" class="summary-box"></div>
+  <div class="table-wrap"><table id="costTable"></table></div>
 </div>
 
 <script>
@@ -79,6 +117,15 @@ const SEEKERS = {
   radar:    { min: 0.1, max: 1.0, procFactor: 0.4, defaultCone: 180 },
   sonar:    { min: 0.1, max: 1.0, procFactor: 0.4, defaultCone: 60 },
   simpleIr: { min: 0.15, max: 0.3, procFactor: 1.0, defaultCone: 30 },
+};
+const CONTROLLER_COST = 50;
+const LAUNCHER_COST = { S: 800, M: 600, L: 2400, H: 18000 };
+const HEALTH_PER_DECOY = { S: 24, M: 240, L: 2400, H: 19200 };
+const GANTRY = {
+  S: { cost: 200, perGantry: 4, launcherIncludesOne: true },
+  M: { cost: 200, perGantry: 2, launcherIncludesOne: false },
+  L: { cost: 800, perGantry: 1, launcherIncludesOne: false },
+  H: { cost: 6000, perGantry: 1, launcherIncludesOne: false },
 };
 
 function rangeFalloff(r) { return 1.0 / (1.0 + r / 1000.0); }
@@ -107,179 +154,284 @@ function pAnyDecoyWins(pSingle, n) { return 1.0 - Math.pow(1.0 - pSingle, n); }
 function ammoCost(k, vol) { return BASE_AMMO_COST * vol * k; }
 function reloadTime(k, cl) { return BASE_RELOAD_TIME * Math.sqrt(cl * k); }
 
+function systemCost(sizeKey, totalComponents, numLaunchers) {
+  const g = GANTRY[sizeKey];
+  const numGantries = Math.ceil(totalComponents / g.perGantry);
+  const extraGantries = g.launcherIncludesOne ? Math.max(0, numGantries - 1) : numGantries;
+  return CONTROLLER_COST + LAUNCHER_COST[sizeKey] * numLaunchers + extraGantries * g.cost * numLaunchers;
+}
+
 function getVal(id) { return document.getElementById(id).value; }
 function getNum(id) { const v = getVal(id); return v === '' ? null : parseFloat(v); }
 function getInt(id) { const v = getVal(id); return v === '' ? null : parseInt(v, 10); }
 
-function calculate() {
+// Shared state
+function getGlobals() {
   const targetSig = getNum('targetSignal') || 5000;
-  const sizeKey = getVal('size');
-  const size = SIZES[sizeKey];
   const seekerType = document.getElementById('simpleIr').checked ? 'simpleIr' : 'radar';
-  const missiles = getInt('missiles') || 1;
+  const missiles = Math.min(getInt('missiles') || 1, 10);
   const targetPct = (getNum('targetPct') || 90) / 100.0;
-  let maxK = 10;
   const hasProcessor = document.getElementById('processor').checked;
   const [mMin, mMax] = multRange(seekerType, hasProcessor);
-  const cone = SEEKERS[seekerType].defaultCone;
+
+  const angleOpen = document.getElementById('angleSection').classList.contains('open');
+  const cone = angleOpen ? (getNum('cone') ?? 180) : SEEKERS[seekerType].defaultCone;
+  const aShip = angleOpen ? (getNum('angleShip') || 0) : 0;
+  const aDecoy = angleOpen ? (getNum('angleDecoy') || 0) : 0;
 
   const rShipRaw = getNum('rangeShip');
   const rDecoyRaw = getNum('rangeDecoy');
-  const hasGeo = rShipRaw !== null || rDecoyRaw !== null;
+  const hasGeo = rShipRaw !== null || rDecoyRaw !== null || aShip !== 0 || aDecoy !== 0;
   const rShip = rShipRaw ?? 0;
   const rDecoy = rDecoyRaw ?? 0;
-  const aShip = 0;
-  const aDecoy = 0;
 
-  function calcTau(k) {
-    const sig = decoySignal(k, size.area);
+  function calcTau(k, sizeOverride) {
+    const area = sizeOverride ? SIZES[sizeOverride].area : SIZES[getVal('size')].area;
+    const sig = decoySignal(k, area);
     if (hasGeo) return effectiveTau(targetSig, sig, rShip, rDecoy, aShip, aDecoy, cone);
     return targetSig / sig;
   }
 
-  // Summary
+  return { targetSig, seekerType, missiles, targetPct, hasProcessor, mMin, mMax, cone, aShip, aDecoy, rShip, rDecoy, hasGeo, calcTau };
+}
+
+function renderComponents() {
+  const g = getGlobals();
+  const sizeKey = getVal('size');
+  const size = SIZES[sizeKey];
+
   let lines = [];
-  lines.push(`Detection range:  ${targetSig.toFixed(0)}m`);
+  lines.push(`Detection range:  ${g.targetSig.toFixed(0)}m`);
   lines.push(`Missile size:     ${sizeKey} (area=${size.area}x)`);
-  lines.push(`Signal processor: ${hasProcessor ? 'yes' : 'no'}`);
-  lines.push(`Decoy missiles:   ${missiles}`);
-  if (hasGeo) {
-    lines.push(`Ship range:       ${rShip.toFixed(0)}m  angle: ${aShip.toFixed(0)}\u00b0`);
-    lines.push(`Decoy range:      ${rDecoy.toFixed(0)}m  angle: ${aDecoy.toFixed(0)}\u00b0`);
-    const aModDecoy = angleModifier(aDecoy, cone);
+  lines.push(`Signal processor: ${g.hasProcessor ? 'yes' : 'no'}`);
+  lines.push(`Decoy missiles:   ${g.missiles}`);
+  if (g.hasGeo) {
+    lines.push(`Ship range:       ${g.rShip.toFixed(0)}m  angle: ${g.aShip.toFixed(0)}\u00b0`);
+    lines.push(`Decoy range:      ${g.rDecoy.toFixed(0)}m  angle: ${g.aDecoy.toFixed(0)}\u00b0`);
+    const aModDecoy = angleModifier(g.aDecoy, g.cone);
     const geoFactor = aModDecoy > 0
-      ? (rangeFalloff(rShip) / rangeFalloff(rDecoy)) * (angleModifier(aShip, cone) / aModDecoy)
+      ? (rangeFalloff(g.rShip) / rangeFalloff(g.rDecoy)) * (angleModifier(g.aShip, g.cone) / aModDecoy)
       : Infinity;
     lines.push(`Geometry factor:  ${geoFactor.toFixed(2)}x (>1 = ship favored, <1 = decoy favored)`);
   } else {
     lines.push(`Geometry:         co-located (worst case for decoy)`);
   }
 
-  // Find min K
   let minK = null;
   for (let k = 1; k < 200; k++) {
-    const tau = calcTau(k);
-    const pOne = pSingleDecoyWins(tau, mMin, mMax);
-    const pAny = pAnyDecoyWins(pOne, missiles);
-    if (pAny >= targetPct) { minK = k; break; }
+    const tau = g.calcTau(k);
+    const pOne = pSingleDecoyWins(tau, g.mMin, g.mMax);
+    const pAny = pAnyDecoyWins(pOne, g.missiles);
+    if (pAny >= g.targetPct) { minK = k; break; }
   }
   lines.push('');
   if (minK !== null) {
     const sig = decoySignal(minK, size.area);
     const cost = ammoCost(minK, size.volume);
     const reload = reloadTime(minK, size.componentLength);
-    const tau = calcTau(minK);
-    const pOne = pSingleDecoyWins(tau, mMin, mMax);
-    const pAny = pAnyDecoyWins(pOne, missiles);
-    lines.push(`Min decoy components for ${(targetPct*100).toFixed(0)}%: ${minK}`);
+    const pOne = pSingleDecoyWins(g.calcTau(minK), g.mMin, g.mMax);
+    const pAny = pAnyDecoyWins(pOne, g.missiles);
+    lines.push(`Min decoy components for ${(g.targetPct*100).toFixed(0)}%: ${minK}`);
     lines.push(`  signal=${sig.toFixed(0)}  ammo=${cost.toFixed(1)}  reload=${reload.toFixed(1)}s  P=${(pAny*100).toFixed(1)}%`);
   } else {
-    lines.push(`Cannot reach ${(targetPct*100).toFixed(0)}% with \u2264199 decoy components`);
+    lines.push(`Cannot reach ${(g.targetPct*100).toFixed(0)}% with \u2264199 decoy components`);
   }
   document.getElementById('summary').textContent = lines.join('\n');
 
-  // Expand max K
+  let maxK = 10;
   if (minK !== null && minK > maxK - 5) maxK = minK + 5;
 
-  // Find last zero K
   let lastZeroK = 0;
   for (let k = 1; k <= maxK; k++) {
-    const tau = calcTau(k);
-    const pOne = pSingleDecoyWins(tau, mMin, mMax);
-    const pAny = pAnyDecoyWins(pOne, missiles);
+    const pAny = pAnyDecoyWins(pSingleDecoyWins(g.calcTau(k), g.mMin, g.mMax), g.missiles);
     if (pAny <= 0) lastZeroK = k;
   }
 
-  // Main table
-  const tbl = document.getElementById('mainTable');
   let html = '<thead><tr><th>Decoy Components</th><th>Signal</th><th>Ammo</th><th>Ammo/s</th><th>Reload</th><th>Probability(1)</th>';
-  if (missiles > 1) html += `<th>Probability(${missiles})</th>`;
+  if (g.missiles > 1) html += `<th>Probability(${g.missiles})</th>`;
   html += '</tr></thead><tbody>';
   for (let k = 1; k <= maxK; k++) {
     if (k < lastZeroK) continue;
     const sig = decoySignal(k, size.area);
-    const tau = calcTau(k);
+    const tau = g.calcTau(k);
     const cost = ammoCost(k, size.volume);
     const reload = reloadTime(k, size.componentLength);
-    const pOne = pSingleDecoyWins(tau, mMin, mMax);
-    const pAny = pAnyDecoyWins(pOne, missiles);
-    const cls = k === minK ? ' class="highlight"' : (pAny <= 0 ? ' class="zero"' : '');
+    const pOne = pSingleDecoyWins(tau, g.mMin, g.mMax);
+    const pAny = pAnyDecoyWins(pOne, g.missiles);
+    const cls = k === minK ? ' class="highlight"' : '';
     html += `<tr${cls}><td>${k}</td><td>${sig.toFixed(0)}</td><td>${cost.toFixed(0)}</td><td>${(cost/reload).toFixed(1)}</td><td>${reload.toFixed(1)}s</td><td>${(pOne*100).toFixed(1)}%</td>`;
-    if (missiles > 1) html += `<td>${(pAny*100).toFixed(1)}%</td>`;
+    if (g.missiles > 1) html += `<td>${(pAny*100).toFixed(1)}%</td>`;
     html += '</tr>';
   }
   html += '</tbody>';
-  tbl.innerHTML = html;
+  document.getElementById('mainTable').innerHTML = html;
+}
 
-  // Budget optimization
+function renderAmmo() {
+  const g = getGlobals();
+  const sizeKey = getVal('sizeAmmo');
+  const size = SIZES[sizeKey];
   const budget = getNum('budget');
-  const budgetSection = document.getElementById('budgetSection');
-  if (budget !== null && budget > 0) {
-    budgetSection.style.display = '';
-    const maxLaunchers = getInt('maxLaunchers');
+  const maxLaunchers = getInt('maxLaunchers');
 
-    let rows = [];
-    let pastPerfect = 0;
-    for (let k = 1; k <= 99; k++) {
-      const cost = ammoCost(k, size.volume);
-      const reload = reloadTime(k, size.componentLength);
-      const ammoPerSec = cost / reload;
-      const tau = calcTau(k);
-      const pOne = pSingleDecoyWins(tau, mMin, mMax);
-      if (pOne <= 0) continue;
-      const maxAffordable = Math.min(Math.floor(budget / ammoPerSec), maxLaunchers ?? Infinity);
-      if (maxAffordable <= 0) continue;
-      // Min launchers to meet target
-      let minLaunchers;
-      if (pOne >= 1.0) minLaunchers = 1;
-      else minLaunchers = Math.ceil(Math.log(1 - targetPct) / Math.log(1 - pOne));
-      const numLaunchers = Math.min(minLaunchers, maxAffordable);
-      const pAny = pAnyDecoyWins(pOne, numLaunchers);
-      const totalAmmo = numLaunchers * ammoPerSec;
-      rows.push({ k, pOne, numLaunchers, totalAmmo, pAny, meetsTarget: pAny >= targetPct });
-      // Stop a few rows after pOne hits 100%
-      if (pOne >= 1.0) { pastPerfect++; if (pastPerfect >= 3) break; }
+  if (budget === null || budget <= 0) {
+    document.getElementById('budgetSummary').textContent = 'Enter an ammo budget to see results.';
+    document.getElementById('budgetTable').innerHTML = '';
+    return;
+  }
+
+  let rows = [];
+  let pastPerfect = 0;
+  for (let k = 1; k <= 99; k++) {
+    const cost = ammoCost(k, size.volume);
+    const reload = reloadTime(k, size.componentLength);
+    const ammoPerSec = cost / reload;
+    const tau = g.calcTau(k, sizeKey);
+    const pOne = pSingleDecoyWins(tau, g.mMin, g.mMax);
+    if (pOne <= 0) continue;
+    const maxAffordable = Math.min(Math.floor(budget / ammoPerSec), maxLaunchers ?? 10, 10);
+    if (maxAffordable <= 0) continue;
+    let minLaunch;
+    if (pOne >= 1.0) minLaunch = 1;
+    else minLaunch = Math.ceil(Math.log(1 - g.targetPct) / Math.log(1 - pOne));
+    const numLaunchers = Math.min(minLaunch, maxAffordable);
+    const pAny = pAnyDecoyWins(pOne, numLaunchers);
+    const totalAmmo = numLaunchers * ammoPerSec;
+    rows.push({ k, pOne, numLaunchers, totalAmmo, pAny, meetsTarget: pAny >= g.targetPct });
+    if (pOne >= 1.0) { pastPerfect++; if (pastPerfect >= 3) break; }
+  }
+
+  let bestIdx = null;
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    if (bestIdx === null) { bestIdx = i; continue; }
+    const best = rows[bestIdx];
+    if (r.meetsTarget && !best.meetsTarget) { bestIdx = i; continue; }
+    if (!r.meetsTarget && best.meetsTarget) continue;
+    if (r.meetsTarget && best.meetsTarget) {
+      if (r.totalAmmo < best.totalAmmo - 0.01) bestIdx = i;
+    } else {
+      if (r.pAny > best.pAny + 0.001) bestIdx = i;
+      else if (Math.abs(r.pAny - best.pAny) < 0.001 && r.totalAmmo < best.totalAmmo - 0.01) bestIdx = i;
     }
+  }
 
-    // Find best: meets target with least ammo; else highest pAny (least ammo if tied)
-    let bestIdx = null;
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
-      if (bestIdx === null) { bestIdx = i; continue; }
-      const best = rows[bestIdx];
-      if (r.meetsTarget && !best.meetsTarget) { bestIdx = i; continue; }
-      if (!r.meetsTarget && best.meetsTarget) continue;
-      if (r.meetsTarget && best.meetsTarget) {
-        if (r.totalAmmo < best.totalAmmo - 0.01) bestIdx = i;
-      } else {
-        if (r.pAny > best.pAny + 0.001) bestIdx = i;
-        else if (Math.abs(r.pAny - best.pAny) < 0.001 && r.totalAmmo < best.totalAmmo - 0.01) bestIdx = i;
+  let bLines = [`Budget: ${budget.toFixed(1)} ammo/sec`];
+  if (maxLaunchers !== null) bLines.push(`Max launchers: ${maxLaunchers}`);
+  if (bestIdx !== null) {
+    const r = rows[bestIdx];
+    bLines.push(`Optimal: ${r.k} decoy components  P=${(r.pAny*100).toFixed(1)}%`);
+    bLines.push(`  P(1)=${(r.pOne*100).toFixed(1)}%  launchers=${r.numLaunchers}  ammo/s=${r.totalAmmo.toFixed(1)}`);
+  } else {
+    bLines.push('No affordable configuration');
+  }
+  document.getElementById('budgetSummary').textContent = bLines.join('\n');
+
+  let bHtml = '<thead><tr><th>Decoy Components</th><th>Launchers</th><th>Ammo/s</th><th>Probability(1)</th><th>Probability(any)</th></tr></thead><tbody>';
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const cls = bestIdx !== null && i === bestIdx ? ' class="highlight"' : '';
+    const marker = bestIdx !== null && i === bestIdx ? ' <span class="marker">&larr;</span>' : '';
+    bHtml += `<tr${cls}><td>${r.k}</td><td>${r.numLaunchers}</td><td>${r.totalAmmo.toFixed(1)}</td><td>${(r.pOne*100).toFixed(1)}%</td><td>${(r.pAny*100).toFixed(1)}%${marker}</td></tr>`;
+  }
+  bHtml += '</tbody>';
+  document.getElementById('budgetTable').innerHTML = bHtml;
+}
+
+function launcherHeight(sizeKey, numGantries) {
+  const gantryHeight = sizeKey === 'H' ? 2 : 1;
+  return 1 + numGantries * gantryHeight;
+}
+
+function renderCost() {
+  const g = getGlobals();
+  const additional = getInt('additionalComponents') || 0;
+  const maxHeight = getNum('maxHeight') ?? 10;
+  const minHealth = getInt('minHealth') || 0;
+
+  let results = [];
+  for (const sizeKey of ['S', 'M', 'L', 'H']) {
+    const size = SIZES[sizeKey];
+    const gantryInfo = GANTRY[sizeKey];
+    let hitPerfect = false;
+    for (let k = 1; k <= 99; k++) {
+      const tau = g.calcTau(k, sizeKey);
+      const pOne = pSingleDecoyWins(tau, g.mMin, g.mMax);
+      if (pOne <= 0) continue;
+      if (hitPerfect) break;
+      if (pOne >= 1.0) hitPerfect = true;
+
+      const totalComp = k + additional;
+      const numGantries = Math.ceil(totalComp / gantryInfo.perGantry);
+      const height = launcherHeight(sizeKey, numGantries);
+      if (height > maxHeight) continue;
+      const health = k * HEALTH_PER_DECOY[sizeKey];
+      if (health < minHealth) continue;
+
+      const costPerMissile = ammoCost(totalComp, size.volume);
+      const reload = reloadTime(totalComp, size.componentLength);
+      const ammoPerSec = costPerMissile / reload;
+
+      for (let n = 1; n <= 10; n++) {
+        const pAny = pAnyDecoyWins(pOne, n);
+        const sc = systemCost(sizeKey, totalComp, n);
+        const efficiency = pAny / sc;
+        results.push({ sizeKey, k, n, height, health, pOne, pAny, sc, efficiency, ammoPerSec: n * ammoPerSec, meetsTarget: pAny >= g.targetPct });
       }
     }
-
-    let bLines = [`Budget: ${budget.toFixed(1)} ammo/sec`];
-    if (maxLaunchers !== null) bLines.push(`Max launchers: ${maxLaunchers}`);
-    if (bestIdx !== null) {
-      const r = rows[bestIdx];
-      bLines.push(`Optimal: ${r.k} decoy components  P=${(r.pAny*100).toFixed(1)}%`);
-      bLines.push(`  P(1)=${(r.pOne*100).toFixed(1)}%  launchers=${r.numLaunchers}  ammo/s=${r.totalAmmo.toFixed(1)}`);
-    } else {
-      bLines.push('No affordable configuration');
-    }
-    document.getElementById('budgetSummary').textContent = bLines.join('\n');
-
-    let bHtml = '<thead><tr><th>Decoy Components</th><th>Launchers</th><th>Ammo/s</th><th>Probability(1)</th><th>Probability(any)</th></tr></thead><tbody>';
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
-      const cls = bestIdx !== null && i === bestIdx ? ' class="highlight"' : '';
-      const marker = bestIdx !== null && i === bestIdx ? ' <span class="marker">&larr;</span>' : '';
-      bHtml += `<tr${cls}><td>${r.k}</td><td>${r.numLaunchers}</td><td>${r.totalAmmo.toFixed(1)}</td><td>${(r.pOne*100).toFixed(1)}%</td><td>${(r.pAny*100).toFixed(1)}%${marker}</td></tr>`;
-    }
-    bHtml += '</tbody>';
-    document.getElementById('budgetTable').innerHTML = bHtml;
-  } else {
-    budgetSection.style.display = 'none';
   }
+
+  // Sort by efficiency descending, only show those meeting target first
+  const meeting = results.filter(r => r.meetsTarget).sort((a, b) => b.efficiency - a.efficiency);
+  const notMeeting = results.filter(r => !r.meetsTarget).sort((a, b) => b.efficiency - a.efficiency);
+  const display = meeting.length > 0 ? meeting.slice(0, 20) : notMeeting.slice(0, 20);
+
+  let cLines = [];
+  if (additional > 0) cLines.push(`Additional components: ${additional}`);
+  cLines.push(`Max height: ${maxHeight}m`);
+  if (display.length > 0) {
+    const best = display[0];
+    cLines.push(`Best: ${best.sizeKey} size, ${best.k} decoy + ${additional} extra, ${best.n} launchers`);
+    cLines.push(`  Cost=${best.sc}  Height=${best.height}m  P(1)=${(best.pOne*100).toFixed(1)}%  P(any)=${(best.pAny*100).toFixed(1)}%  P/Cost=${(best.efficiency*100).toFixed(4)}`);
+  } else {
+    cLines.push('No viable configuration');
+  }
+  document.getElementById('costSummary').textContent = cLines.join('\n');
+
+  let cHtml = '<thead><tr><th>Size</th><th>Decoy Comp.</th><th>Launchers</th><th>Height</th><th>System Cost</th><th>Ammo/s</th><th>Health</th><th>P(1)</th><th>P(any)</th><th>P/Cost</th></tr></thead><tbody>';
+  for (let i = 0; i < display.length; i++) {
+    const r = display[i];
+    const cls = i === 0 ? ' class="highlight"' : '';
+    cHtml += `<tr${cls}><td>${r.sizeKey}</td><td>${r.k}</td><td>${r.n}</td><td>${r.height}m</td><td>${r.sc}</td><td>${(r.ammoPerSec).toFixed(1)}</td><td>${r.health}</td><td>${(r.pOne*100).toFixed(1)}%</td><td>${(r.pAny*100).toFixed(1)}%</td><td>${(r.efficiency*100).toFixed(4)}</td></tr>`;
+  }
+  cHtml += '</tbody>';
+  document.getElementById('costTable').innerHTML = cHtml;
+}
+
+// Tab switching
+let activeTab = 'components';
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeTab = btn.dataset.tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + activeTab));
+    calculate();
+  });
+});
+
+// Angle toggle
+document.getElementById('angleToggle').addEventListener('click', () => {
+  const section = document.getElementById('angleSection');
+  const toggle = document.getElementById('angleToggle');
+  section.classList.toggle('open');
+  toggle.textContent = (section.classList.contains('open') ? '\u25BC' : '\u25B6') + ' Advanced Angle Settings';
+  calculate();
+});
+
+function calculate() {
+  if (activeTab === 'components') renderComponents();
+  else if (activeTab === 'ammo') renderAmmo();
+  else if (activeTab === 'cost') renderCost();
 }
 
 document.querySelectorAll('input, select').forEach(el => {
